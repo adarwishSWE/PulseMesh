@@ -1,0 +1,37 @@
+BasedOnStyle: LLVM
+
+# --- indentation & line length ---
+IndentWidth: 4
+UseTab: Never
+ColumnLimit: 100
+AccessModifierOffset: -4
+NamespaceIndentation: None
+Standard: c++20
+
+# --- braces & short forms ---
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Inline   # ← was: All
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# --- pointer & spacing ---
+PointerAlignment: Left                     # ← new: int* p, not int *p
+SpaceAfterCStyleCast: false                 # ← new: (uint8_t)val
+SpacesBeforeTrailingComments: 2
+
+# --- alignment ---
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignTrailingComments: true
+AlignConsecutiveAssignments: AcrossEmptyLines  # ← new
+AlignConsecutiveMacros: AcrossEmptyLines       # ← new: for #define blocks
+
+# --- function parameters ---
+BinPackParameters: false                    # ← new: one param per line when wrapping
+AllowAllParametersOfDeclarationOnNextLine: false  # ← new
+
+# --- includes & comments ---
+SortIncludes: Never
+IncludeBlocks: Preserve                    # ← new: keeps your include groups intact
+InsertNewlineAtEOF: true
+ReflowComments: false                      # ← new: don't break Doxygen comments

@@ -1,0 +1,89 @@
+// WARNING: This file is the system contract.
+// Any change requires coordinated updates across C++ and Python.
+// Do not modify field numbers, names, or RPC signatures without approval.
+
+syntax = "proto3";
+package pulsemesh;
+
+// --- Core Metric Types ---
+
+// A single data point from a client.
+// The name is free-form (dynamic), e.g. "cpu_usage", "memory_used", "custom_counter".
+message Metric {
+    string name = 1;                    // Metric name
+    double value = 2;                   // Numeric value
+    map<string, string> tags = 3;       // Dimensions, e.g. {"host": "client-A", "cpu": "0"}
+    int64 timestamp_ms = 4;             // Unix epoch in milliseconds
+}
+
+// A batch of metrics sent by a client in one stream message.
+message MetricBatch {
+    string client_id = 1;                // Unique client identifier
+    repeated Metric metrics = 2;        // One or more metrics in this batch
+}
+
+// --- Client Configuration (downstream) ---
+
+// Pushed by Aggregator to Client over the bidi stream.
+// Controls what the client collects and how often.
+message ClientConfig {
+    int32 sampling_interval_ms = 1;     // How often to collect metrics
+    repeated string metric_names = 2;   // What to collect; empty = auto-discover all
+}
+
+// --- Query Messages ---
+
+message RangeRequest {
+    string metric_name = 1;             // Metric to query
+    int64 from_ms = 2;                  // Start timestamp (inclusive)
+    int64 to_ms = 3;                    // End timestamp (inclusive)
+    map<string, string> tags_filter = 4; // Optional dimension filter
+}
+
+// NOTE: avg/max/min are pre-computed convenience fields for the MVP.
+// They are always populated regardless of whether the client needs them.
+// If p95, stddev, or histograms are needed later, add a separate
+// AggregateRequest/AggregateResponse RPC rather than extending this message.
+message RangeResponse {
+    repeated Metric metrics = 1;        // Raw data points in range
+    double avg = 2;                     // Pre-computed average
+    double max = 3;                     // Pre-computed maximum
+    double min = 4;                     // Pre-computed minimum
+}
+
+message LatestRequest {
+    string metric_name = 1;
+    map<string, string> tags_filter = 2;
+}
+
+message LatestResponse {
+    Metric metric = 1;                  // Most recent data point matching filter
+}
+
+message SubscribeRequest {
+    string metric_name = 1;
+    map<string, string> tags_filter = 2;
+}
+
+// Pushed to subscribers whenever a new matching metric arrives.
+message MetricEvent {
+    Metric metric = 1;
+    double rolling_avg_1m = 2;       // Pre-computed 1-minute rolling average
+    bool   has_rolling_avg_1m = 3;   // false = not enough data yet (< 1 min of samples)
+}
+
+// --- Service Definition ---
+
+service AggregatorService {
+    // Client <-> Aggregator: bidirectional streaming RPC.
+    // Client pushes MetricBatch upstream.
+    // Aggregator pushes ClientConfig (sampling rate, metrics to collect) downstream.
+    rpc StreamMetrics(stream MetricBatch) returns (stream ClientConfig);
+
+    // Client queries
+    rpc QueryRange(RangeRequest) returns (RangeResponse);
+    rpc QueryLatest(LatestRequest) returns (LatestResponse);
+
+    // Client subscription: server pushes MetricEvent whenever new data arrives.
+    rpc Subscribe(SubscribeRequest) returns (stream MetricEvent);
+}

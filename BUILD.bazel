@@ -1,0 +1,2 @@
+# Root BUILD file — exports and groups targets only.
+# Individual targets are defined in their package's BUILD file.
