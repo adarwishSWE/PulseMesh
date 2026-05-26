@@ -1,6 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 # ------------------------------------------------------------------------------
 # C++ proto + gRPC stubs

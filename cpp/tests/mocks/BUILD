@@ -1,5 +1,7 @@
 package(default_visibility = ["//cpp/tests:__subpackages__"])
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 cc_library(
     name = "mock_time_series_store",
     hdrs = ["mock_time_series_store.h"],

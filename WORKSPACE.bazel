@@ -2,6 +2,23 @@ workspace(name = "pulsemesh")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
+# ── Hedron compile_commands.json extractor (must be early — deps stay current) ─
+# https://github.com/hedronvision/bazel-compile-commands-extractor
+http_archive(
+    name = "hedron_compile_commands",
+    url = "https://github.com/hedronvision/bazel-compile-commands-extractor/archive/0e990032f3c5a866e72615cf67e5ce22186dcb97.tar.gz",
+    strip_prefix = "bazel-compile-commands-extractor-0e990032f3c5a866e72615cf67e5ce22186dcb97",
+    sha256 = "2b3ee8bba2df4542a508b0289727b031427162b4cd381850f89b406445c17578",
+)
+load("@hedron_compile_commands//:workspace_setup.bzl", "hedron_compile_commands_setup")
+hedron_compile_commands_setup()
+load("@hedron_compile_commands//:workspace_setup_transitive.bzl", "hedron_compile_commands_setup_transitive")
+hedron_compile_commands_setup_transitive()
+load("@hedron_compile_commands//:workspace_setup_transitive_transitive.bzl", "hedron_compile_commands_setup_transitive_transitive")
+hedron_compile_commands_setup_transitive_transitive()
+load("@hedron_compile_commands//:workspace_setup_transitive_transitive_transitive.bzl", "hedron_compile_commands_setup_transitive_transitive_transitive")
+hedron_compile_commands_setup_transitive_transitive_transitive()
+
 # ── rules_cc (pin BEFORE grpc_deps to prevent override) ──────────────────────
 http_archive(
     name = "rules_cc",
@@ -9,6 +26,10 @@ http_archive(
     sha256 = "2037875b9a4456dce4a79d112a8ae885bbc4aad968e6587dca6e64f3a0900cdf",
     strip_prefix = "rules_cc-0.0.9",
 )
+
+load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
+rules_cc_dependencies()
+rules_cc_toolchains()
 
 # ── gRPC 1.56.2 ───────────────────────────────────────────────────────────────
 http_archive(
