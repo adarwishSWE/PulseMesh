@@ -1,7 +1,7 @@
-package(default_visibility = ["//visibility:public"])
-
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
 
 # ------------------------------------------------------------------------------
 # C++ proto + gRPC stubs
@@ -28,8 +28,8 @@ cc_grpc_library(
 cc_library(
     name = "metrics_cc",
     deps = [
-        ":metrics_cc_proto",
         ":metrics_cc_grpc",
+        ":metrics_cc_proto",
     ],
 )
 

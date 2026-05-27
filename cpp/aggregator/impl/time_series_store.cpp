@@ -2,51 +2,49 @@
 
 #include <algorithm>
 #include <mutex>
+#include <ranges>
 #include <vector>
 
 namespace pulsemesh {
 namespace {
 
-bool MatchesTags(const Metric& metric,
-                 const google::protobuf::Map<std::string, std::string>& tags_filter) {
-    for (const auto& [filter_key, filter_value] : tags_filter) {
-        const auto it = metric.tags().find(filter_key);
-        if (it == metric.tags().end() || it->second != filter_value) {
-            return false;
-        }
-    }
-    return true;
+bool matches_tags(const Metric& metric,
+    const google::protobuf::Map<std::string, std::string>& tags_filter) {
+    return std::ranges::all_of(tags_filter, [&metric](const auto& filter_entry) {
+        const auto tag_it = metric.tags().find(filter_entry.first);
+        return tag_it != metric.tags().end() && tag_it->second == filter_entry.second;
+    });
 }
 
 struct AggregateStats {
-    double avg = 0.0;
-    double max = 0.0;
-    double min = 0.0;
+    double avg_ = 0.0;
+    double max_ = 0.0;
+    double min_ = 0.0;
 };
 
-AggregateStats ComputeStats(const std::vector<double>& values) {
+AggregateStats compute_stats(const std::vector<double>& values) {
     AggregateStats stats;
     if (values.empty()) {
         return stats;
     }
 
     double sum = 0.0;
-    stats.max = values.front();
-    stats.min = values.front();
+    stats.max_ = values.front();
+    stats.min_ = values.front();
     for (const double value : values) {
         sum += value;
-        stats.max = std::max(stats.max, value);
-        stats.min = std::min(stats.min, value);
+        stats.max_ = std::max(stats.max_, value);
+        stats.min_ = std::min(stats.min_, value);
     }
-    stats.avg = sum / static_cast<double>(values.size());
+    stats.avg_ = sum / static_cast<double>(values.size());
     return stats;
 }
 
-}  // namespace
+} // namespace
 
 TimeSeriesStore::TimeSeriesStore(std::size_t capacity_per_metric)
-    : capacity_per_metric_(capacity_per_metric == 0 ? kDefaultCapacityPerMetric
-                                                    : capacity_per_metric) {}
+    : capacity_per_metric_(
+          capacity_per_metric == 0 ? kDefaultCapacityPerMetric : capacity_per_metric) {}
 
 void TimeSeriesStore::Insert(const Metric& metric) {
     std::unique_lock lock(mutex_);
@@ -55,13 +53,10 @@ void TimeSeriesStore::Insert(const Metric& metric) {
     if (buffer.empty() || metric.timestamp_ms() >= buffer.back().timestamp_ms()) {
         buffer.push_back(metric);
     } else {
-        const auto insert_it = std::upper_bound(
-            buffer.begin(),
-            buffer.end(),
+        const auto insert_it = std::ranges::upper_bound(buffer,
             metric.timestamp_ms(),
-            [](int64_t timestamp_ms, const Metric& existing) {
-                return timestamp_ms < existing.timestamp_ms();
-            });
+            std::ranges::less{},
+            [](const Metric& existing) { return existing.timestamp_ms(); });
         buffer.insert(insert_it, metric);
     }
 
@@ -80,21 +75,16 @@ RangeResponse TimeSeriesStore::QueryRange(const RangeRequest& request) const {
     }
 
     const std::deque<Metric>& buffer = buffer_it->second;
-    const auto start_it = std::lower_bound(
-        buffer.begin(),
-        buffer.end(),
+    const auto start_it = std::ranges::lower_bound(buffer,
         request.from_ms(),
-        [](const Metric& metric, int64_t timestamp_ms) {
-            return metric.timestamp_ms() < timestamp_ms;
-        });
+        std::ranges::less{},
+        [](const Metric& metric) { return metric.timestamp_ms(); });
 
     std::vector<double> values;
     values.reserve(buffer.size());
 
-    for (auto it = start_it;
-         it != buffer.end() && it->timestamp_ms() <= request.to_ms();
-         ++it) {
-        if (!MatchesTags(*it, request.tags_filter())) {
+    for (auto it = start_it; it != buffer.end() && it->timestamp_ms() <= request.to_ms(); ++it) {
+        if (!matches_tags(*it, request.tags_filter())) {
             continue;
         }
 
@@ -102,10 +92,10 @@ RangeResponse TimeSeriesStore::QueryRange(const RangeRequest& request) const {
         values.push_back(it->value());
     }
 
-    const AggregateStats stats = ComputeStats(values);
-    response.set_avg(stats.avg);
-    response.set_max(stats.max);
-    response.set_min(stats.min);
+    const AggregateStats stats = compute_stats(values);
+    response.set_avg(stats.avg_);
+    response.set_max(stats.max_);
+    response.set_min(stats.min_);
     return response;
 }
 
@@ -118,17 +108,17 @@ std::optional<LatestResponse> TimeSeriesStore::QueryLatest(const LatestRequest& 
     }
 
     const std::deque<Metric>& buffer = buffer_it->second;
-    for (auto it = buffer.rbegin(); it != buffer.rend(); ++it) {
-        if (!MatchesTags(*it, request.tags_filter())) {
+    for (const Metric& metric : std::ranges::reverse_view(buffer)) {
+        if (!matches_tags(metric, request.tags_filter())) {
             continue;
         }
 
         LatestResponse response;
-        *response.mutable_metric() = *it;
+        *response.mutable_metric() = metric;
         return response;
     }
 
     return std::nullopt;
 }
 
-}  // namespace pulsemesh
+} // namespace pulsemesh

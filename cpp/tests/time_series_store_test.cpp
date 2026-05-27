@@ -16,10 +16,8 @@
 namespace pulsemesh {
 namespace {
 
-Metric MakeMetric(const std::string& name,
-                  double value,
-                  int64_t timestamp_ms,
-                  const std::map<std::string, std::string>& tags = {}) {
+Metric make_metric(const std::string& name, double value, int64_t timestamp_ms,
+    const std::map<std::string, std::string>& tags = {}) {
     Metric metric;
     metric.set_name(name);
     metric.set_value(value);
@@ -30,13 +28,13 @@ Metric MakeMetric(const std::string& name,
     return metric;
 }
 
-int64_t NowMs() {
+int64_t now_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::system_clock::now().time_since_epoch())
+        std::chrono::system_clock::now().time_since_epoch())
         .count();
 }
 
-}  // namespace
+} // namespace
 
 class TimeSeriesStoreTest : public ::testing::Test {};
 
@@ -44,9 +42,9 @@ class TimeSeriesStoreTest : public ::testing::Test {};
 TEST_F(TimeSeriesStoreTest, GivenMetricsInserted_WhenQueriedByRange_ThenReturnsCorrectSubset) {
     // Given
     TimeSeriesStore store;
-    store.Insert(MakeMetric("cpu", 50.0, 1000));
-    store.Insert(MakeMetric("cpu", 60.0, 2000));
-    store.Insert(MakeMetric("cpu", 70.0, 3000));
+    store.Insert(make_metric("cpu", 50.0, 1000));
+    store.Insert(make_metric("cpu", 60.0, 2000));
+    store.Insert(make_metric("cpu", 70.0, 3000));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -67,11 +65,11 @@ TEST_F(TimeSeriesStoreTest, GivenMetricsInserted_WhenQueriedByRange_ThenReturnsC
 TEST_F(TimeSeriesStoreTest, GivenCapacityExceeded_WhenInserting_ThenEvictsOldestEntry) {
     // Given
     TimeSeriesStore store(2);
-    store.Insert(MakeMetric("cpu", 10.0, 1000));
-    store.Insert(MakeMetric("cpu", 20.0, 2000));
+    store.Insert(make_metric("cpu", 10.0, 1000));
+    store.Insert(make_metric("cpu", 20.0, 2000));
 
     // When
-    store.Insert(MakeMetric("cpu", 30.0, 3000));
+    store.Insert(make_metric("cpu", 30.0, 3000));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -89,9 +87,9 @@ TEST_F(TimeSeriesStoreTest, GivenCapacityExceeded_WhenInserting_ThenEvictsOldest
 TEST_F(TimeSeriesStoreTest, GivenTaggedMetrics_WhenFilteredByTags_ThenReturnsMatchingSubset) {
     // Given
     TimeSeriesStore store;
-    store.Insert(MakeMetric("cpu", 10.0, 1000, {{"host", "a"}}));
-    store.Insert(MakeMetric("cpu", 20.0, 2000, {{"host", "b"}}));
-    store.Insert(MakeMetric("cpu", 30.0, 3000, {{"host", "a"}}));
+    store.Insert(make_metric("cpu", 10.0, 1000, {{"host", "a"}}));
+    store.Insert(make_metric("cpu", 20.0, 2000, {{"host", "b"}}));
+    store.Insert(make_metric("cpu", 30.0, 3000, {{"host", "a"}}));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -113,11 +111,11 @@ TEST_F(TimeSeriesStoreTest, GivenTaggedMetrics_WhenFilteredByTags_ThenReturnsMat
 TEST_F(TimeSeriesStoreTest, GivenOutOfOrderTimestamp_WhenInserting_ThenSampleIsSorted) {
     // Given
     TimeSeriesStore store;
-    store.Insert(MakeMetric("cpu", 10.0, 2000));
-    store.Insert(MakeMetric("cpu", 20.0, 3000));
+    store.Insert(make_metric("cpu", 10.0, 2000));
+    store.Insert(make_metric("cpu", 20.0, 3000));
 
     // When
-    store.Insert(MakeMetric("cpu", 15.0, 1500));
+    store.Insert(make_metric("cpu", 15.0, 1500));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -136,10 +134,10 @@ TEST_F(TimeSeriesStoreTest, GivenOutOfOrderTimestamp_WhenInserting_ThenSampleIsS
 TEST_F(TimeSeriesStoreTest, GivenOutOfOrderTaggedMetric_WhenInserting_ThenSampleIsSorted) {
     // Given
     TimeSeriesStore store;
-    store.Insert(MakeMetric("cpu", 10.0, 3000, {{"host", "a"}}));
+    store.Insert(make_metric("cpu", 10.0, 3000, {{"host", "a"}}));
 
     // When
-    store.Insert(MakeMetric("cpu", 20.0, 2000, {{"host", "b"}}));
+    store.Insert(make_metric("cpu", 20.0, 2000, {{"host", "b"}}));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -161,8 +159,8 @@ TEST_F(TimeSeriesStoreTest, GivenZeroCapacity_WhenInserting_ThenUsesDefaultCapac
 
     // When
     for (int i = 0; i < 5; ++i) {
-        store_with_zero.Insert(MakeMetric("cpu", static_cast<double>(i), 1000 + i));
-        store_with_default.Insert(MakeMetric("cpu", static_cast<double>(i), 1000 + i));
+        store_with_zero.Insert(make_metric("cpu", static_cast<double>(i), 1000 + i));
+        store_with_default.Insert(make_metric("cpu", static_cast<double>(i), 1000 + i));
     }
 
     RangeRequest request;
@@ -182,9 +180,9 @@ TEST_F(TimeSeriesStoreTest, GivenZeroCapacity_WhenInserting_ThenUsesDefaultCapac
 TEST_F(TimeSeriesStoreTest, GivenEqualTimestamps_WhenInserting_ThenPreservesArrivalOrder) {
     // Given
     TimeSeriesStore store;
-    store.Insert(MakeMetric("cpu", 10.0, 1000));
-    store.Insert(MakeMetric("cpu", 20.0, 1000));
-    store.Insert(MakeMetric("cpu", 30.0, 1000));
+    store.Insert(make_metric("cpu", 10.0, 1000));
+    store.Insert(make_metric("cpu", 20.0, 1000));
+    store.Insert(make_metric("cpu", 30.0, 1000));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -210,7 +208,7 @@ TEST_F(TimeSeriesStoreTest, GivenConcurrentAccess_WhenInsertingAndQuerying_ThenN
     // When
     std::thread writer([&store, &done]() {
         for (int i = 0; i < 1000; ++i) {
-            store.Insert(MakeMetric("cpu", static_cast<double>(i), NowMs() + i));
+            store.Insert(make_metric("cpu", static_cast<double>(i), now_ms() + i));
         }
         done.store(true);
     });
@@ -243,8 +241,8 @@ TEST_F(TimeSeriesStoreTest, GivenConcurrentAccess_WhenInsertingAndQuerying_ThenN
 TEST_F(TimeSeriesStoreTest, GivenMetricsInserted_WhenQueryLatest_ThenReturnsNewestMatch) {
     // Given
     TimeSeriesStore store;
-    store.Insert(MakeMetric("cpu", 10.0, 1000, {{"host", "a"}}));
-    store.Insert(MakeMetric("cpu", 20.0, 2000, {{"host", "a"}}));
+    store.Insert(make_metric("cpu", 10.0, 1000, {{"host", "a"}}));
+    store.Insert(make_metric("cpu", 20.0, 2000, {{"host", "a"}}));
 
     LatestRequest request;
     request.set_metric_name("cpu");
@@ -273,4 +271,4 @@ TEST_F(TimeSeriesStoreTest, GivenNoData_WhenQueryLatest_ThenReturnsNullopt) {
     EXPECT_FALSE(response.has_value());
 }
 
-}  // namespace pulsemesh
+} // namespace pulsemesh

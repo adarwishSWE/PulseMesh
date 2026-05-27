@@ -18,10 +18,10 @@ public:
     // Returns std::nullopt when no metric matches the request.
     virtual std::optional<LatestResponse> QueryLatest(const LatestRequest& request) const = 0;
 
-    ITimeSeriesStore(const ITimeSeriesStore&)            = delete;
+    ITimeSeriesStore(const ITimeSeriesStore&) = delete;
     ITimeSeriesStore& operator=(const ITimeSeriesStore&) = delete;
-    ITimeSeriesStore(ITimeSeriesStore&&)                 = delete;
-    ITimeSeriesStore& operator=(ITimeSeriesStore&&)      = delete;
+    ITimeSeriesStore(ITimeSeriesStore&&) = delete;
+    ITimeSeriesStore& operator=(ITimeSeriesStore&&) = delete;
 };
 
-}  // namespace pulsemesh
+} // namespace pulsemesh

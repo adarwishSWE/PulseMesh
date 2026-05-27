@@ -18,8 +18,7 @@ public:
     static constexpr std::size_t kDefaultCapacityPerMetric = 10000;
 
     // capacity_per_metric == 0 is treated as kDefaultCapacityPerMetric.
-    explicit TimeSeriesStore(
-        std::size_t capacity_per_metric = kDefaultCapacityPerMetric);
+    explicit TimeSeriesStore(std::size_t capacity_per_metric = kDefaultCapacityPerMetric);
     ~TimeSeriesStore() override = default;
 
     void Insert(const Metric& metric) override;
@@ -28,15 +27,15 @@ public:
 
     std::optional<LatestResponse> QueryLatest(const LatestRequest& request) const override;
 
-    TimeSeriesStore(const TimeSeriesStore&)            = delete;
+    TimeSeriesStore(const TimeSeriesStore&) = delete;
     TimeSeriesStore& operator=(const TimeSeriesStore&) = delete;
-    TimeSeriesStore(TimeSeriesStore&&)                 = delete;
-    TimeSeriesStore& operator=(TimeSeriesStore&&)      = delete;
+    TimeSeriesStore(TimeSeriesStore&&) = delete;
+    TimeSeriesStore& operator=(TimeSeriesStore&&) = delete;
 
 private:
     std::size_t capacity_per_metric_;
-    mutable std::shared_mutex mutex_;  // protects metric_buffers_
+    mutable std::shared_mutex mutex_; // protects metric_buffers_
     std::unordered_map<std::string, std::deque<Metric>> metric_buffers_;
 };
 
-}  // namespace pulsemesh
+} // namespace pulsemesh

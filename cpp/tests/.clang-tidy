@@ -1,0 +1,3 @@
+# GTest patterns (ASSERT_*, optional->) do not satisfy some bugprone checks.
+InheritParentConfig: true
+Checks: '-bugprone-unchecked-optional-access,-bugprone-easily-swappable-parameters'

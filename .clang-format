@@ -10,28 +10,23 @@ Standard: c++20
 
 # --- braces & short forms ---
 BreakBeforeBraces: Attach
-AllowShortFunctionsOnASingleLine: Inline   # ← was: All
+AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 
-# --- pointer & spacing ---
-PointerAlignment: Left                     # ← new: int* p, not int *p
-SpaceAfterCStyleCast: false                 # ← new: (uint8_t)val
-SpacesBeforeTrailingComments: 2
+# --- pointers ---
+PointerAlignment: Left
+SpaceAfterCStyleCast: false
 
-# --- alignment ---
-AlignAfterOpenBracket: Align
-AlignOperands: Align
+# --- alignment (LLVM defaults: no column-padding) ---
+AlignAfterOpenBracket: DontAlign
+AlignOperands: DontAlign
 AlignTrailingComments: true
-AlignConsecutiveAssignments: AcrossEmptyLines  # ← new
-AlignConsecutiveMacros: AcrossEmptyLines       # ← new: for #define blocks
-
-# --- function parameters ---
-BinPackParameters: false                    # ← new: one param per line when wrapping
-AllowAllParametersOfDeclarationOnNextLine: false  # ← new
+BinPackArguments: false
+AllowAllArgumentsOnNextLine: false
 
 # --- includes & comments ---
 SortIncludes: Never
-IncludeBlocks: Preserve                    # ← new: keeps your include groups intact
+IncludeBlocks: Preserve
 InsertNewlineAtEOF: true
-ReflowComments: false                      # ← new: don't break Doxygen comments
+ReflowComments: false

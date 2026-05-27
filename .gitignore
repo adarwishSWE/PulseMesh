@@ -4,6 +4,9 @@
 bazel-*
 .bazelrc.user
 # .bazelversion is intentionally tracked — Bazelisk reads it to pin the version
+# Bzlmod is disabled (--noenable_bzlmod); ignore auto-generated MODULE files
+MODULE.bazel
+MODULE.bazel.lock
 
 # -----------------------------------------------------------------------------
 # C++

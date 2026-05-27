@@ -23,6 +23,6 @@ CheckOptions:
   - key:   readability-identifier-naming.MacroDefinitionCase
     value: UPPER_CASE
 
-WarningsAsErrors: ''
-HeaderFilterRegex: '.*'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '^cpp/'
 FormatStyle: file

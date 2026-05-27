@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Git pre-commit: buildifier, clang-format, and clang-tidy on staged files.
+# Uses .clang-format, .clang-tidy, and compile_commands.json (see refresh_compile_commands.sh).
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+resolve_buildifier() {
+    if command -v buildifier >/dev/null 2>&1; then
+        command -v buildifier
+        return
+    fi
+    if [[ -x "${HOME}/.local/bin/buildifier" ]]; then
+        echo "${HOME}/.local/bin/buildifier"
+        return
+    fi
+    echo ""
+}
+
+BUILDIFIER="$(resolve_buildifier)"
+
+mapfile -t BAZEL_FILES < <(
+    git diff --cached --name-only --diff-filter=ACM |
+        grep -E '(^|/)BUILD(\.bazel)?$|(^|/)WORKSPACE(\.bazel)?$|^MODULE\.bazel$|\.bzl$' || true
+)
+
+if [[ ${#BAZEL_FILES[@]} -gt 0 ]]; then
+    if [[ -z "$BUILDIFIER" ]]; then
+        echo "[pre-commit] buildifier not found; install to ~/.local/bin or PATH" >&2
+        exit 1
+    fi
+    "$BUILDIFIER" "${BAZEL_FILES[@]}"
+    git add -- "${BAZEL_FILES[@]}"
+    echo "[pre-commit] buildifier (${#BAZEL_FILES[@]} file(s))"
+fi
+
+mapfile -t FORMAT_FILES < <(
+    git diff --cached --name-only --diff-filter=ACM | grep -E '^cpp/.*\.(cpp|h)$' || true
+)
+
+if [[ ${#FORMAT_FILES[@]} -gt 0 ]]; then
+    if ! command -v clang-format >/dev/null 2>&1; then
+        echo "[pre-commit] clang-format not found; install clang-format or skip with git commit --no-verify" >&2
+        exit 1
+    fi
+    clang-format --style=file -i "${FORMAT_FILES[@]}"
+    git add -- "${FORMAT_FILES[@]}"
+    echo "[pre-commit] clang-format (${#FORMAT_FILES[@]} file(s))"
+fi
+
+mapfile -t TIDY_FILES < <(
+    git diff --cached --name-only --diff-filter=ACM | grep -E '^cpp/.*\.cpp$' || true
+)
+
+if [[ ${#TIDY_FILES[@]} -eq 0 ]]; then
+    exit 0
+fi
+
+if [[ ! -f compile_commands.json ]]; then
+    echo "[pre-commit] compile_commands.json missing; run scripts/refresh_compile_commands.sh" >&2
+    exit 1
+fi
+
+if ! command -v run-clang-tidy >/dev/null 2>&1; then
+    echo "[pre-commit] run-clang-tidy not found" >&2
+    exit 1
+fi
+
+run-clang-tidy -p . -header-filter='^cpp/' -warnings-as-errors='*' -quiet "${TIDY_FILES[@]}"
+echo "[pre-commit] clang-tidy (${#TIDY_FILES[@]} file(s))"

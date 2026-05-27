@@ -12,10 +12,8 @@ class MockTimeSeriesStore : public ITimeSeriesStore {
 public:
     MOCK_METHOD(void, Insert, (const Metric& metric), (override));
     MOCK_METHOD(RangeResponse, QueryRange, (const RangeRequest& request), (const, override));
-    MOCK_METHOD((std::optional<LatestResponse>),
-                QueryLatest,
-                (const LatestRequest& request),
-                (const, override));
+    MOCK_METHOD((std::optional<LatestResponse>), QueryLatest, (const LatestRequest& request),
+        (const, override));
 };
 
-}  // namespace pulsemesh
+} // namespace pulsemesh
