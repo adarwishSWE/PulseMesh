@@ -56,7 +56,9 @@ void TimeSeriesStore::Insert(const Metric& metric) {
         const auto insert_it = std::ranges::upper_bound(buffer,
             metric.timestamp_ms(),
             std::ranges::less{},
-            [](const Metric& existing) { return existing.timestamp_ms(); });
+            [](const Metric& existing) {
+                return existing.timestamp_ms();
+            });
         buffer.insert(insert_it, metric);
     }
 
@@ -78,7 +80,9 @@ RangeResponse TimeSeriesStore::QueryRange(const RangeRequest& request) const {
     const auto start_it = std::ranges::lower_bound(buffer,
         request.from_ms(),
         std::ranges::less{},
-        [](const Metric& metric) { return metric.timestamp_ms(); });
+        [](const Metric& metric) {
+            return metric.timestamp_ms();
+        });
 
     std::vector<double> values;
     values.reserve(buffer.size());

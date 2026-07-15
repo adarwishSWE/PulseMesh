@@ -1,13 +1,14 @@
 # Use WORKSPACE, not Bzlmod
 common --noenable_bzlmod
 
-# C++20
-build --cxxopt=-std=c++20
-build --host_cxxopt=-std=c++20
+# C++17 is the compatibility baseline for generated code, external dependencies, and build-time
+# tools. C++23 and strict warnings override it for handwritten project translation units.
+build --cxxopt=-std=c++17
+build --host_cxxopt=-std=c++17
+build --per_file_copt=^cpp/.*@-std=c++23,-Wall,-Wextra
 
-# Warnings (keep -Wextra off — external deps like protobuf trip on unused-parameter)
+# External compatibility flags.
 # -Wno-deprecated-enum-enum-conversion: upb enums in newer gcc
-build --cxxopt=-Wall
 build --cxxopt=-Wno-deprecated-enum-enum-conversion
 build --host_cxxopt=-Wno-deprecated-enum-enum-conversion
 
@@ -16,3 +17,21 @@ build --jobs=auto
 
 # Show output on test failure
 test --test_output=errors
+
+# Optimized build used by repeatable performance benchmarks.
+build:benchmark --compilation_mode=opt
+build:benchmark --copt=-fno-omit-frame-pointer
+build:benchmark --linkopt=-fno-omit-frame-pointer
+
+# Sanitizer configurations. Run ThreadSanitizer separately from ASan/UBSan.
+build:asan --copt=-fsanitize=address
+build:asan --linkopt=-fsanitize=address
+build:asan --copt=-fno-omit-frame-pointer
+
+build:ubsan --copt=-fsanitize=undefined
+build:ubsan --linkopt=-fsanitize=undefined
+build:ubsan --copt=-fno-omit-frame-pointer
+
+build:tsan --copt=-fsanitize=thread
+build:tsan --linkopt=-fsanitize=thread
+build:tsan --copt=-fno-omit-frame-pointer

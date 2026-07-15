@@ -6,16 +6,20 @@ UseTab: Never
 ColumnLimit: 100
 AccessModifierOffset: -4
 NamespaceIndentation: None
-Standard: c++20
+# clang-format 18 does not expose a c++23 enum; Latest enables its newest parser behavior.
+Standard: Latest
 
 # --- braces & short forms ---
 BreakBeforeBraces: Attach
-AllowShortFunctionsOnASingleLine: Inline
+AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortLambdasOnASingleLine: Empty
 
 # --- pointers ---
 PointerAlignment: Left
+DerivePointerAlignment: false
 SpaceAfterCStyleCast: false
 
 # --- alignment (LLVM defaults: no column-padding) ---

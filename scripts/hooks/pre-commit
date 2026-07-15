@@ -57,15 +57,5 @@ if [[ ${#TIDY_FILES[@]} -eq 0 ]]; then
     exit 0
 fi
 
-if [[ ! -f compile_commands.json ]]; then
-    echo "[pre-commit] compile_commands.json missing; run scripts/refresh_compile_commands.sh" >&2
-    exit 1
-fi
-
-if ! command -v run-clang-tidy >/dev/null 2>&1; then
-    echo "[pre-commit] run-clang-tidy not found" >&2
-    exit 1
-fi
-
-run-clang-tidy -p . -header-filter='^cpp/' -warnings-as-errors='*' -quiet "${TIDY_FILES[@]}"
+scripts/clang_tidy.sh "${TIDY_FILES[@]}"
 echo "[pre-commit] clang-tidy (${#TIDY_FILES[@]} file(s))"

@@ -12,12 +12,16 @@ MODULE.bazel.lock
 # C++
 # -----------------------------------------------------------------------------
 *.o
+*.obj
 *.a
 *.so
 *.dylib
 *.dll
+*.lib
 *.exe
 *.out
+*.pdb
+*.dSYM/
 build/
 cmake-build-*/
 compile_commands.json
@@ -33,9 +37,51 @@ __pycache__/
 dist/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
 .venv/
 venv/
 env/
+
+# -----------------------------------------------------------------------------
+# Environment and secrets
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+.pgpass
+secrets/
+deploy/secrets/
+
+# -----------------------------------------------------------------------------
+# PostgreSQL / Docker runtime
+# -----------------------------------------------------------------------------
+pgdata/
+postgres-data/
+deploy/data/
+docker-compose.override.yml
+
+# -----------------------------------------------------------------------------
+# Logs and runtime output
+# -----------------------------------------------------------------------------
+*.log
+logs/
+run/
+
+# -----------------------------------------------------------------------------
+# Coverage, sanitizers, profiling, and test output
+# -----------------------------------------------------------------------------
+coverage/
+*.gcda
+*.gcno
+*.lcov
+*.profraw
+*.profdata
+perf.data
+perf.data.*
+test-results/
 
 # -----------------------------------------------------------------------------
 # IDE / Editor

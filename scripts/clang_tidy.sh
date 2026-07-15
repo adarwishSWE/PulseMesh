@@ -39,7 +39,13 @@ if [[ ${#FILES[@]} -eq 0 ]]; then
     exit 0
 fi
 
+# Hedron's extracted command omits Protobuf's transitive source include root.
+# Supply it explicitly so clang-tidy uses the Bazel-pinned headers instead of
+# an incompatible system installation.
+PROTOBUF_INCLUDE='-isystemexternal/com_google_protobuf/src'
+
 # HeaderFilterRegex in .clang-tidy restricts diagnostics to cpp/; pass explicitly for run-clang-tidy.
-run-clang-tidy -p . -header-filter='^cpp/' -warnings-as-errors='*' -quiet "${EXTRA_ARGS[@]}" \
+run-clang-tidy -p . -header-filter='^cpp/' -warnings-as-errors='*' -quiet \
+    -extra-arg="${PROTOBUF_INCLUDE}" "${EXTRA_ARGS[@]}" \
     "${FILES[@]}"
 echo "[clang_tidy] OK (${#FILES[@]} files)"
