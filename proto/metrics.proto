@@ -14,12 +14,14 @@ message Metric {
     double value = 2;                   // Numeric value
     map<string, string> tags = 3;       // Dimensions, e.g. {"host": "client-A", "cpu": "0"}
     int64 timestamp_ms = 4;             // Unix epoch in milliseconds
+    string source_client_id = 5;        // Set by the Aggregator from MetricBatch.client_id
 }
 
 // A batch of metrics sent by a client in one stream message.
 message MetricBatch {
     string client_id = 1;                // Unique client identifier
     repeated Metric metrics = 2;        // One or more metrics in this batch
+    string batch_id = 3;                 // Stable unique identifier retained across retries
 }
 
 // --- Client Configuration (downstream) ---
@@ -31,6 +33,20 @@ message ClientConfig {
     repeated string metric_names = 2;   // What to collect; empty = auto-discover all
 }
 
+// Confirms that a batch is durably committed or was committed by an earlier attempt.
+message BatchAck {
+    string batch_id = 1;
+    bool duplicate = 2;                 // True when the batch was already committed
+}
+
+// Downstream messages sent by the Aggregator over the bidirectional stream.
+message StreamResponse {
+    oneof payload {
+        ClientConfig config = 1;
+        BatchAck ack = 2;
+    }
+}
+
 // --- Query Messages ---
 
 message RangeRequest {
@@ -38,22 +54,27 @@ message RangeRequest {
     int64 from_ms = 2;                  // Start timestamp (inclusive)
     int64 to_ms = 3;                    // End timestamp (inclusive)
     map<string, string> tags_filter = 4; // Optional dimension filter
+    optional string client_id = 5;      // Absent = all source clients; present must be non-empty
+    uint32 page_size = 6;               // Zero uses the server default
+    string page_token = 7;              // Opaque continuation token from a previous response
 }
 
-// NOTE: avg/max/min are pre-computed convenience fields for the MVP.
-// They are always populated regardless of whether the client needs them.
-// If p95, stddev, or histograms are needed later, add a separate
-// AggregateRequest/AggregateResponse RPC rather than extending this message.
+// avg/max/min describe the complete snapshot-bounded filtered range, not only the current page.
+// They remain identical on every page belonging to the same paginated query and are always
+// populated regardless of whether the client needs them. If p95, stddev, or histograms are
+// needed later, add a separate AggregateRequest/AggregateResponse RPC.
 message RangeResponse {
     repeated Metric metrics = 1;        // Raw data points in range
     double avg = 2;                     // Pre-computed average
     double max = 3;                     // Pre-computed maximum
     double min = 4;                     // Pre-computed minimum
+    string next_page_token = 5;         // Empty when no additional page exists
 }
 
 message LatestRequest {
     string metric_name = 1;
     map<string, string> tags_filter = 2;
+    optional string client_id = 3;      // Absent = all source clients; present must be non-empty
 }
 
 message LatestResponse {
@@ -63,6 +84,8 @@ message LatestResponse {
 message SubscribeRequest {
     string metric_name = 1;
     map<string, string> tags_filter = 2;
+    optional string client_id = 3;      // Absent = all source clients; present must be non-empty
+    int64 after_event_id = 4;            // Resume strictly after this committed event; zero = now
 }
 
 // Pushed to subscribers whenever a new matching metric arrives.
@@ -70,6 +93,7 @@ message MetricEvent {
     Metric metric = 1;
     double rolling_avg_1m = 2;       // Pre-computed 1-minute rolling average
     bool   has_rolling_avg_1m = 3;   // false = not enough data yet (< 1 min of samples)
+    int64 event_id = 4;              // Monotonic committed event ID, beginning at one
 }
 
 // --- Service Definition ---
@@ -77,8 +101,8 @@ message MetricEvent {
 service AggregatorService {
     // Client <-> Aggregator: bidirectional streaming RPC.
     // Client pushes MetricBatch upstream.
-    // Aggregator pushes ClientConfig (sampling rate, metrics to collect) downstream.
-    rpc StreamMetrics(stream MetricBatch) returns (stream ClientConfig);
+    // Aggregator pushes configuration and durable commit acknowledgements downstream.
+    rpc StreamMetrics(stream MetricBatch) returns (stream StreamResponse);
 
     // Client queries
     rpc QueryRange(RangeRequest) returns (RangeResponse);
