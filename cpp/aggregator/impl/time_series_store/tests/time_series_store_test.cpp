@@ -1,7 +1,7 @@
 // Tests TimeSeriesStore: insert, range query with aggregates, capacity eviction,
 // tag filtering, out-of-order sorting, and concurrent insert/query.
 
-#include "cpp/aggregator/impl/time_series_store.h"
+#include "cpp/aggregator/impl/time_series_store/time_series_store.h"
 
 #include <atomic>
 #include <chrono>
@@ -16,12 +16,20 @@
 namespace pulsemesh {
 namespace {
 
-Metric make_metric(const std::string& name, double value, int64_t timestamp_ms,
-    const std::map<std::string, std::string>& tags = {}) {
+struct MetricValue {
+    double value_;
+};
+
+struct MetricTimestampMs {
+    int64_t value_;
+};
+
+Metric make_metric(const std::string& name, MetricValue value, MetricTimestampMs timestamp_ms,
+                   const std::map<std::string, std::string>& tags = {}) {
     Metric metric;
     metric.set_name(name);
-    metric.set_value(value);
-    metric.set_timestamp_ms(timestamp_ms);
+    metric.set_value(value.value_);
+    metric.set_timestamp_ms(timestamp_ms.value_);
     for (const auto& tag : tags) {
         (*metric.mutable_tags())[tag.first] = tag.second;
     }
@@ -30,7 +38,7 @@ Metric make_metric(const std::string& name, double value, int64_t timestamp_ms,
 
 int64_t now_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch())
+               std::chrono::system_clock::now().time_since_epoch())
         .count();
 }
 
@@ -38,13 +46,14 @@ int64_t now_ms() {
 
 class TimeSeriesStoreTest : public ::testing::Test {};
 
-// Given inserted metrics, When queried by range, Then returns correct subset and aggregates.
+// Verifies that an inclusive time-range query returns every retained sample in bounds and computes
+// average, minimum, and maximum from exactly those returned values.
 TEST_F(TimeSeriesStoreTest, GivenMetricsInserted_WhenQueriedByRange_ThenReturnsCorrectSubset) {
     // Given
     TimeSeriesStore store;
-    store.Insert(make_metric("cpu", 50.0, 1000));
-    store.Insert(make_metric("cpu", 60.0, 2000));
-    store.Insert(make_metric("cpu", 70.0, 3000));
+    store.Insert(make_metric("cpu", MetricValue{50.0}, MetricTimestampMs{1000}));
+    store.Insert(make_metric("cpu", MetricValue{60.0}, MetricTimestampMs{2000}));
+    store.Insert(make_metric("cpu", MetricValue{70.0}, MetricTimestampMs{3000}));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -61,15 +70,16 @@ TEST_F(TimeSeriesStoreTest, GivenMetricsInserted_WhenQueriedByRange_ThenReturnsC
     EXPECT_DOUBLE_EQ(response.min(), 50.0);
 }
 
-// Given capacity exceeded, When inserting another point, Then oldest entry is evicted.
+// Verifies bounded retention by ensuring insertion beyond per-metric capacity evicts the oldest
+// timestamp while preserving newer samples in query order.
 TEST_F(TimeSeriesStoreTest, GivenCapacityExceeded_WhenInserting_ThenEvictsOldestEntry) {
     // Given
     TimeSeriesStore store(2);
-    store.Insert(make_metric("cpu", 10.0, 1000));
-    store.Insert(make_metric("cpu", 20.0, 2000));
+    store.Insert(make_metric("cpu", MetricValue{10.0}, MetricTimestampMs{1000}));
+    store.Insert(make_metric("cpu", MetricValue{20.0}, MetricTimestampMs{2000}));
 
     // When
-    store.Insert(make_metric("cpu", 30.0, 3000));
+    store.Insert(make_metric("cpu", MetricValue{30.0}, MetricTimestampMs{3000}));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -83,13 +93,14 @@ TEST_F(TimeSeriesStoreTest, GivenCapacityExceeded_WhenInserting_ThenEvictsOldest
     EXPECT_DOUBLE_EQ(response.metrics(1).value(), 30.0);
 }
 
-// Given tagged metrics, When queried with tag filter, Then returns matching subset only.
+// Verifies that range tag filters require matching key/value pairs and that aggregates are
+// calculated only from the filtered subset rather than all samples in the time range.
 TEST_F(TimeSeriesStoreTest, GivenTaggedMetrics_WhenFilteredByTags_ThenReturnsMatchingSubset) {
     // Given
     TimeSeriesStore store;
-    store.Insert(make_metric("cpu", 10.0, 1000, {{"host", "a"}}));
-    store.Insert(make_metric("cpu", 20.0, 2000, {{"host", "b"}}));
-    store.Insert(make_metric("cpu", 30.0, 3000, {{"host", "a"}}));
+    store.Insert(make_metric("cpu", MetricValue{10.0}, MetricTimestampMs{1000}, {{"host", "a"}}));
+    store.Insert(make_metric("cpu", MetricValue{20.0}, MetricTimestampMs{2000}, {{"host", "b"}}));
+    store.Insert(make_metric("cpu", MetricValue{30.0}, MetricTimestampMs{3000}, {{"host", "a"}}));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -107,15 +118,16 @@ TEST_F(TimeSeriesStoreTest, GivenTaggedMetrics_WhenFilteredByTags_ThenReturnsMat
     EXPECT_DOUBLE_EQ(response.avg(), 20.0);
 }
 
-// Given out-of-order timestamp, When inserting, Then sample is kept in sorted order.
+// Verifies that an older sample arriving after newer samples is inserted at its timestamp-ordered
+// position instead of being appended or discarded.
 TEST_F(TimeSeriesStoreTest, GivenOutOfOrderTimestamp_WhenInserting_ThenSampleIsSorted) {
     // Given
     TimeSeriesStore store;
-    store.Insert(make_metric("cpu", 10.0, 2000));
-    store.Insert(make_metric("cpu", 20.0, 3000));
+    store.Insert(make_metric("cpu", MetricValue{10.0}, MetricTimestampMs{2000}));
+    store.Insert(make_metric("cpu", MetricValue{20.0}, MetricTimestampMs{3000}));
 
     // When
-    store.Insert(make_metric("cpu", 15.0, 1500));
+    store.Insert(make_metric("cpu", MetricValue{15.0}, MetricTimestampMs{1500}));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -130,14 +142,15 @@ TEST_F(TimeSeriesStoreTest, GivenOutOfOrderTimestamp_WhenInserting_ThenSampleIsS
     EXPECT_DOUBLE_EQ(response.metrics(2).value(), 20.0);
 }
 
-// Given out-of-order timestamp from another host, When inserting, Then sample is kept.
+// Verifies that out-of-order insertion remains timestamp ordered regardless of tag differences,
+// since tags filter samples but do not partition the metric's retained buffer.
 TEST_F(TimeSeriesStoreTest, GivenOutOfOrderTaggedMetric_WhenInserting_ThenSampleIsSorted) {
     // Given
     TimeSeriesStore store;
-    store.Insert(make_metric("cpu", 10.0, 3000, {{"host", "a"}}));
+    store.Insert(make_metric("cpu", MetricValue{10.0}, MetricTimestampMs{3000}, {{"host", "a"}}));
 
     // When
-    store.Insert(make_metric("cpu", 20.0, 2000, {{"host", "b"}}));
+    store.Insert(make_metric("cpu", MetricValue{20.0}, MetricTimestampMs{2000}, {{"host", "b"}}));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -151,7 +164,8 @@ TEST_F(TimeSeriesStoreTest, GivenOutOfOrderTaggedMetric_WhenInserting_ThenSample
     EXPECT_DOUBLE_EQ(response.metrics(1).value(), 10.0);
 }
 
-// Given zero capacity, When inserting, Then uses default capacity like default constructor.
+// Verifies constructor fallback semantics by proving that an explicit zero capacity retains the
+// same default number of newest samples as the default constructor.
 TEST_F(TimeSeriesStoreTest, GivenZeroCapacity_WhenInserting_ThenUsesDefaultCapacity) {
     // Given
     TimeSeriesStore store_with_zero(0);
@@ -159,8 +173,10 @@ TEST_F(TimeSeriesStoreTest, GivenZeroCapacity_WhenInserting_ThenUsesDefaultCapac
 
     // When
     for (int i = 0; i < 5; ++i) {
-        store_with_zero.Insert(make_metric("cpu", static_cast<double>(i), 1000 + i));
-        store_with_default.Insert(make_metric("cpu", static_cast<double>(i), 1000 + i));
+        store_with_zero.Insert(
+            make_metric("cpu", MetricValue{static_cast<double>(i)}, MetricTimestampMs{1000 + i}));
+        store_with_default.Insert(
+            make_metric("cpu", MetricValue{static_cast<double>(i)}, MetricTimestampMs{1000 + i}));
     }
 
     RangeRequest request;
@@ -176,13 +192,14 @@ TEST_F(TimeSeriesStoreTest, GivenZeroCapacity_WhenInserting_ThenUsesDefaultCapac
     ASSERT_EQ(zero_response.metrics_size(), 5);
 }
 
-// Given equal timestamps, When inserting, Then points are stored in arrival order.
+// Verifies deterministic ordering for equal timestamps by preserving insertion order, which keeps
+// repeated range queries stable when timestamps alone cannot distinguish samples.
 TEST_F(TimeSeriesStoreTest, GivenEqualTimestamps_WhenInserting_ThenPreservesArrivalOrder) {
     // Given
     TimeSeriesStore store;
-    store.Insert(make_metric("cpu", 10.0, 1000));
-    store.Insert(make_metric("cpu", 20.0, 1000));
-    store.Insert(make_metric("cpu", 30.0, 1000));
+    store.Insert(make_metric("cpu", MetricValue{10.0}, MetricTimestampMs{1000}));
+    store.Insert(make_metric("cpu", MetricValue{20.0}, MetricTimestampMs{1000}));
+    store.Insert(make_metric("cpu", MetricValue{30.0}, MetricTimestampMs{1000}));
 
     RangeRequest request;
     request.set_metric_name("cpu");
@@ -199,7 +216,8 @@ TEST_F(TimeSeriesStoreTest, GivenEqualTimestamps_WhenInserting_ThenPreservesArri
     EXPECT_DOUBLE_EQ(response.metrics(2).value(), 30.0);
 }
 
-// Given concurrent writers and readers, When operating simultaneously, Then store remains consistent.
+// Verifies synchronization under concurrent insert and range-query activity by completing both
+// workers without a hang and retaining every inserted sample.
 TEST_F(TimeSeriesStoreTest, GivenConcurrentAccess_WhenInsertingAndQuerying_ThenNoDataRace) {
     // Given
     TimeSeriesStore store;
@@ -208,7 +226,9 @@ TEST_F(TimeSeriesStoreTest, GivenConcurrentAccess_WhenInsertingAndQuerying_ThenN
     // When
     std::thread writer([&store, &done]() {
         for (int i = 0; i < 1000; ++i) {
-            store.Insert(make_metric("cpu", static_cast<double>(i), now_ms() + i));
+            store.Insert(make_metric("cpu",
+                                     MetricValue{static_cast<double>(i)},
+                                     MetricTimestampMs{now_ms() + i}));
         }
         done.store(true);
     });
@@ -237,12 +257,13 @@ TEST_F(TimeSeriesStoreTest, GivenConcurrentAccess_WhenInsertingAndQuerying_ThenN
     EXPECT_EQ(response.metrics_size(), 1000);
 }
 
-// Given metrics exist, When QueryLatest is called with matching filter, Then returns newest point.
+// Verifies that the latest query scans newest-first and returns the most recent sample satisfying
+// all requested tags rather than merely the newest unfiltered metric.
 TEST_F(TimeSeriesStoreTest, GivenMetricsInserted_WhenQueryLatest_ThenReturnsNewestMatch) {
     // Given
     TimeSeriesStore store;
-    store.Insert(make_metric("cpu", 10.0, 1000, {{"host", "a"}}));
-    store.Insert(make_metric("cpu", 20.0, 2000, {{"host", "a"}}));
+    store.Insert(make_metric("cpu", MetricValue{10.0}, MetricTimestampMs{1000}, {{"host", "a"}}));
+    store.Insert(make_metric("cpu", MetricValue{20.0}, MetricTimestampMs{2000}, {{"host", "a"}}));
 
     LatestRequest request;
     request.set_metric_name("cpu");
@@ -252,11 +273,14 @@ TEST_F(TimeSeriesStoreTest, GivenMetricsInserted_WhenQueryLatest_ThenReturnsNewe
     const std::optional<LatestResponse> response = store.QueryLatest(request);
 
     // Then
-    ASSERT_TRUE(response.has_value());
+    if (!response.has_value()) {
+        FAIL() << "Expected the latest matching metric to be available";
+    }
     EXPECT_DOUBLE_EQ(response->metric().value(), 20.0);
 }
 
-// Given no matching metric, When QueryLatest is called, Then returns nullopt.
+// Verifies that absence of a requested metric is represented as normal optional absence rather
+// than a fabricated response or error.
 TEST_F(TimeSeriesStoreTest, GivenNoData_WhenQueryLatest_ThenReturnsNullopt) {
     // Given
     TimeSeriesStore store;

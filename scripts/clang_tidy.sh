@@ -12,6 +12,12 @@ if [[ ! -f compile_commands.json ]]; then
     exit 1
 fi
 
+RUN_CLANG_TIDY=${RUN_CLANG_TIDY:-run-clang-tidy-19}
+if ! command -v "$RUN_CLANG_TIDY" >/dev/null 2>&1; then
+    echo "[clang_tidy] $RUN_CLANG_TIDY not found; clang-tidy 19+ is required for C++23 std::expected" >&2
+    exit 1
+fi
+
 EXTRA_ARGS=()
 ARGS=()
 for arg in "$@"; do
@@ -39,13 +45,14 @@ if [[ ${#FILES[@]} -eq 0 ]]; then
     exit 0
 fi
 
-# Hedron's extracted command omits Protobuf's transitive source include root.
-# Supply it explicitly so clang-tidy uses the Bazel-pinned headers instead of
-# an incompatible system installation.
+# Hedron's extracted command omits Protobuf's transitive source include root and
+# may retain a dependency's earlier language flag. Supply both explicitly so
+# clang-tidy uses the project contract: Bazel-pinned headers parsed as C++23.
 PROTOBUF_INCLUDE='-isystemexternal/com_google_protobuf/src'
+PROJECT_STANDARD='-std=c++23'
 
 # HeaderFilterRegex in .clang-tidy restricts diagnostics to cpp/; pass explicitly for run-clang-tidy.
-run-clang-tidy -p . -header-filter='^cpp/' -warnings-as-errors='*' -quiet \
-    -extra-arg="${PROTOBUF_INCLUDE}" "${EXTRA_ARGS[@]}" \
+"$RUN_CLANG_TIDY" -p . -header-filter='^cpp/' -warnings-as-errors='*' -quiet \
+    -extra-arg="${PROTOBUF_INCLUDE}" -extra-arg="${PROJECT_STANDARD}" "${EXTRA_ARGS[@]}" \
     "${FILES[@]}"
 echo "[clang_tidy] OK (${#FILES[@]} files)"

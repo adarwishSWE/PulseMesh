@@ -13,7 +13,7 @@ cc_library(
 cc_library(
     name = "aggregator_lib",
     deps = [
-        "//cpp/aggregator/impl:time_series_store",
+        "//cpp/aggregator/impl/time_series_store",
         "//proto:metrics_cc",
     ],
 )
